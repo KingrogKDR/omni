@@ -8,7 +8,7 @@
 - Zero/optional configuration
 - Predictable performance
 - Bounded recovery time
-- Minimal storage for only the latest data
+- Minimal storage cost for only the latest data
 
 ## Storage Engine design:
 

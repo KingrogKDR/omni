@@ -4,7 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strings"
+
+	"github.com/KingrogKDR/omni/internal/misc"
 )
 
 var KV map[string]string = make(map[string]string)
@@ -30,15 +31,11 @@ func View() {
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Print("> ")
-		text, err := reader.ReadString('\n')
+		inputSlice, inputArgc, err := misc.ReadInput(reader)
 		if err != nil {
-			fmt.Printf("couldn't read string: %v\n", err)
+			fmt.Printf("input error: %v", err)
 			continue
 		}
-		input := text[:len(text)-1]
-		inputSlice := strings.Split(input, " ")
-		inputArgc := len(inputSlice)
 		switch inputSlice[0] {
 		case "add":
 			if inputArgc != 3 {
