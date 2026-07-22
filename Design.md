@@ -22,12 +22,13 @@
   - lower layer:
     - permanent compact snapshot of the latest sync
     - only contains the latest synced data
+    - it will be stored in the form of partitions with hash(key)%n where n -> no. of partitions
 
 # Read/Write design:
 
 - Read:
   - read always occurs top-down (upper -> lower)
-  - an in-memory map to store the key and the value byte offset in the segment is used to increase performance
+  - uses paritions for better read performance because we only search the partition for the key asked.
   - tombstones are never read
 - Write:
   - write always occurs in the upper layer.
