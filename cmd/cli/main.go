@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/KingrogKDR/omni/internal/misc"
+	"github.com/KingrogKDR/omni/internal/kvstore"
 )
 
 var KV map[string]string = make(map[string]string)
@@ -31,7 +31,7 @@ func View() {
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		inputSlice, inputArgc, err := misc.ReadInput(reader)
+		inputSlice, inputArgc, err := kvstore.ReadInput(reader)
 		if err != nil {
 			fmt.Printf("input error: %v", err)
 			continue
