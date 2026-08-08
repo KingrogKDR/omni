@@ -1,0 +1,4 @@
+message RawGetRequest{
+  string cf = 1;
+  bytes key = 2;
+}
