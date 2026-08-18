@@ -4,7 +4,7 @@ Everything related to the design decisions made keeping in mind the tradeoffs an
 
 ## The network layer
 
-- Wire format: Protobuf
+- Wire format: Protobuf \n
   Doc explaining this choice: https://kingrogkdr.github.io/post.html?slug=omni-post-1
 
 The short version: Protobuf enforces types for fields and removes ambiguity, which is clearly not wanted for a distribution environment
