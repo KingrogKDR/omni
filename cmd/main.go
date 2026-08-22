@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 
@@ -21,6 +22,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	fmt.Println("grpc server listening on", storeAddr)
 	err = grpcServer.Serve(lis)
 	if err != nil {
 		log.Fatal(err)

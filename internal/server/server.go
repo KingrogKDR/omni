@@ -7,7 +7,7 @@ import (
 )
 
 type Server struct {
-	*kvpb.UnimplementedOmniServer
+	kvpb.UnimplementedOmniServer
 }
 
 func NewServer() *Server {

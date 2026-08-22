@@ -1,0 +1,13 @@
+syntax = "proto3";
+package pb;
+option go_package = "bench/pb";
+
+message RaftCmd {
+  uint64 term = 1;
+  uint64 index = 2;
+  uint32 cmd_type = 3; // 0=Get, 1=Put, 2=Delete
+  optional bytes key = 4;
+  optional bytes value = 5;
+  uint64 client_id = 6;
+  uint64 request_id = 7;
+}
