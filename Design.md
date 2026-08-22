@@ -40,4 +40,4 @@ Still there do exist some tradeoffs to be aware of:
 
 Yet Protobuf wins in both safety and speed for Omni.
 
-Full reasoning in the ![linked post](https://kingrogkdr.github.io/post.html?slug=omni-post-1)
+Full reasoning in the [linked post](https://kingrogkdr.github.io/post.html?slug=omni-post-1)
