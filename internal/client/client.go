@@ -50,16 +50,25 @@ func (c *Client) Get(ctx context.Context, key string) (*kvpb.GetResponse, error)
 	return resp, nil
 }
 
-// func (c *Client) Delete(ctx context.Context, key string) (*kvpb.DeleteResponse, error) {
-// 	resp, err := c.rpc.Delete(ctx, &kvpb.DeleteRequest{
-// 		Key: []byte(key),
-// 	})
-// 	if err != nil {
-// 		return nil, fmt.Errorf("delete error: %w", err)
-// 	}
+func (c *Client) Delete(ctx context.Context, key string) (*kvpb.DeleteResponse, error) {
+	resp, err := c.rpc.Delete(ctx, &kvpb.DeleteRequest{
+		Key: []byte(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("delete error: %w", err)
+	}
 
-// 	return resp, nil
-// }
+	return resp, nil
+}
+
+func (c *Client) List(ctx context.Context) (*kvpb.ListResponse, error) {
+	resp, err := c.rpc.List(ctx, &kvpb.ListRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("list error: %w", err)
+	}
+
+	return resp, nil
+}
 
 func (c *Client) Close() error {
 	return c.conn.Close()

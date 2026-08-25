@@ -20,7 +20,11 @@ func NewServer(store storage.Storage) *Server {
 }
 
 func (s *Server) Get(ctx context.Context, req *kvpb.GetRequest) (*kvpb.GetResponse, error) {
-	value, err := s.store.Read(ctx, req.Key)
+	readReq := storage.ReadRequest{
+		Type: storage.GET,
+		Key:  req.Key,
+	}
+	value, err := s.store.Read(ctx, readReq)
 	if err != nil {
 		return &kvpb.GetResponse{}, err
 	}
@@ -30,7 +34,13 @@ func (s *Server) Get(ctx context.Context, req *kvpb.GetRequest) (*kvpb.GetRespon
 }
 
 func (s *Server) Put(ctx context.Context, req *kvpb.PutRequest) (*kvpb.PutResponse, error) {
-	err := s.store.Write(ctx, req.Key, req.Value)
+	writeReq := storage.WriteRequest{
+		Type:  storage.PUT,
+		Key:   req.Key,
+		Value: req.Value,
+	}
+
+	err := s.store.Write(ctx, writeReq)
 	if err != nil {
 		return &kvpb.PutResponse{}, err
 	}
@@ -38,5 +48,24 @@ func (s *Server) Put(ctx context.Context, req *kvpb.PutRequest) (*kvpb.PutRespon
 }
 
 func (s *Server) Delete(ctx context.Context, req *kvpb.DeleteRequest) (*kvpb.DeleteResponse, error) {
+	writeReq := storage.WriteRequest{
+		Type: storage.DELETE,
+		Key:  req.Key,
+	}
+
+	err := s.store.Write(ctx, writeReq)
+	if err != nil {
+		return &kvpb.DeleteResponse{}, err
+	}
 	return &kvpb.DeleteResponse{}, nil
+}
+
+func (s *Server) List(ctx context.Context, req *kvpb.ListRequest) (*kvpb.ListResponse, error) {
+	resp, err := s.store.List(ctx)
+	if err != nil {
+		return &kvpb.ListResponse{}, err
+	}
+	return &kvpb.ListResponse{
+		KeyValue: resp.KeyValue,
+	}, nil
 }

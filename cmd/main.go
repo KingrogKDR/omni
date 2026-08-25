@@ -1,9 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/KingrogKDR/omni/internal/server"
 	"github.com/KingrogKDR/omni/internal/storage"
@@ -12,32 +14,41 @@ import (
 	"google.golang.org/grpc"
 )
 
-const ServerAddr string = "localhost:28051"
+const ServerDefaultAddr string = "localhost:28051"
 
 func main() {
 	opts := badger.DefaultOptions("./data")
-	badger_store, err := storage.NewBadgerStore(opts)
+	store, err := storage.NewBadgerStore(opts)
 	if err != nil {
 		log.Fatalf("Error opening store: %v", err)
 	}
-	defer badger_store.DB.Close()
+	defer store.DB.Close()
 
-	omniServer := server.NewServer(badger_store)
+	omniServer := server.NewServer(store)
 
 	grpcServer := grpc.NewServer()
 	kvpb.RegisterOmniServer(grpcServer, omniServer)
-	lis, err := net.Listen("tcp", ServerAddr)
+	lis, err := net.Listen("tcp", ServerDefaultAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("grpc server listening on", ServerAddr)
-	err = grpcServer.Serve(lis)
-	if err != nil {
-		log.Fatal(err)
-	}
+	stop := make(chan os.Signal, 1)
+	go func() {
+		log.Println("grpc server listening on", ServerDefaultAddr)
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Println("grpc server stopped:", err)
+			stop <- syscall.SIGTERM
+		}
+	}()
 
-	// omniClient := client.NewClient(ServerAddr)
-	// client.Put()
+	waitForShutdown(grpcServer, stop)
+}
 
+func waitForShutdown(grpcServer *grpc.Server, stop chan os.Signal) {
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	<-stop
+
+	log.Println("shutting down gRPC server...")
+	grpcServer.GracefulStop()
 }

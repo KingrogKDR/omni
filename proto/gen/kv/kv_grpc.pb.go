@@ -22,6 +22,7 @@ const (
 	Omni_Get_FullMethodName    = "/kv.Omni/Get"
 	Omni_Put_FullMethodName    = "/kv.Omni/Put"
 	Omni_Delete_FullMethodName = "/kv.Omni/Delete"
+	Omni_List_FullMethodName   = "/kv.Omni/List"
 )
 
 // OmniClient is the client API for Omni service.
@@ -31,6 +32,7 @@ type OmniClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
+	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 }
 
 type omniClient struct {
@@ -71,6 +73,16 @@ func (c *omniClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *omniClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListResponse)
+	err := c.cc.Invoke(ctx, Omni_List_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OmniServer is the server API for Omni service.
 // All implementations must embed UnimplementedOmniServer
 // for forward compatibility.
@@ -78,6 +90,7 @@ type OmniServer interface {
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	Put(context.Context, *PutRequest) (*PutResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
+	List(context.Context, *ListRequest) (*ListResponse, error)
 	mustEmbedUnimplementedOmniServer()
 }
 
@@ -96,6 +109,9 @@ func (UnimplementedOmniServer) Put(context.Context, *PutRequest) (*PutResponse, 
 }
 func (UnimplementedOmniServer) Delete(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
+}
+func (UnimplementedOmniServer) List(context.Context, *ListRequest) (*ListResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method List not implemented")
 }
 func (UnimplementedOmniServer) mustEmbedUnimplementedOmniServer() {}
 func (UnimplementedOmniServer) testEmbeddedByValue()              {}
@@ -172,6 +188,24 @@ func _Omni_Delete_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Omni_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OmniServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Omni_List_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OmniServer).List(ctx, req.(*ListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Omni_ServiceDesc is the grpc.ServiceDesc for Omni service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +224,10 @@ var Omni_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Delete",
 			Handler:    _Omni_Delete_Handler,
+		},
+		{
+			MethodName: "List",
+			Handler:    _Omni_List_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

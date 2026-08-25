@@ -19,12 +19,12 @@ func NewBadgerStore(opts badger.Options) (*BadgerStore, error) {
 	}, err
 }
 
-func (s *BadgerStore) Read(ctx context.Context, key []byte) ([]byte, error) {
+func (s *BadgerStore) Read(ctx context.Context, req ReadRequest) ([]byte, error) {
 	var value []byte
 	txErr := s.DB.Update(func(txn *badger.Txn) error {
-		item, err := txn.Get(key)
+		item, err := txn.Get(req.Key)
 		if err != nil {
-			return fmt.Errorf("store read: %w", err)
+			return fmt.Errorf("store get: %w", err)
 		}
 		val, err := item.ValueCopy(nil)
 		if err != nil {
@@ -34,21 +34,56 @@ func (s *BadgerStore) Read(ctx context.Context, key []byte) ([]byte, error) {
 		return nil
 	})
 	if txErr != nil {
-		return nil, fmt.Errorf("transaction: %w", txErr)
+		return nil, fmt.Errorf("transaction read: %w", txErr)
 	}
 	return value, nil
 }
 
-func (s *BadgerStore) Write(ctx context.Context, key []byte, value []byte) error {
+func (s *BadgerStore) Write(ctx context.Context, req WriteRequest) error {
 	txErr := s.DB.Update(func(txn *badger.Txn) error {
-		err := txn.Set(key, value)
-		if err != nil {
-			return fmt.Errorf("store read: %w", err)
+		switch req.Type {
+		case PUT:
+			err := txn.Set(req.Key, req.Value)
+			if err != nil {
+				return fmt.Errorf("store put: %w", err)
+			}
+		case DELETE:
+			err := txn.Delete(req.Key)
+			if err != nil {
+				return fmt.Errorf("store delete: %w", err)
+			}
 		}
 		return nil
 	})
 	if txErr != nil {
-		return fmt.Errorf("transaction: %w", txErr)
+		return fmt.Errorf("transaction write: %w", txErr)
 	}
 	return nil
+}
+
+func (s *BadgerStore) List(ctx context.Context) (ListResponse, error) {
+	var resp ListResponse
+	txErr := s.DB.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		resp.KeyValue = make(map[string]string, 1)
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(v []byte) error {
+				resp.KeyValue[string(k)] = string(v)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if txErr != nil {
+		return ListResponse{}, fmt.Errorf("transaction list: %w", txErr)
+	}
+	return resp, nil
 }
