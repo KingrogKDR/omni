@@ -10,15 +10,13 @@ import (
 	"github.com/KingrogKDR/omni/internal/server"
 	"github.com/KingrogKDR/omni/internal/storage"
 	kvpb "github.com/KingrogKDR/omni/proto/gen/kv"
-	"github.com/dgraph-io/badger"
 	"google.golang.org/grpc"
 )
 
 const ServerDefaultAddr string = "localhost:28051"
 
 func main() {
-	opts := badger.DefaultOptions("./data")
-	store, err := storage.NewBadgerStore(opts)
+	store, err := storage.NewBadgerStore()
 	if err != nil {
 		log.Fatalf("Error opening store: %v", err)
 	}

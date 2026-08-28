@@ -9,6 +9,7 @@ service Omni {
   rpc Put(PutRequest) returns (PutResponse) {}
   rpc Delete(DeleteRequest) returns (DeleteResponse) {}
   rpc List(ListRequest) returns (ListResponse) {}
+  rpc Scan(ScanRequest) returns (ScanResponse) {}
 }
 
 message GetRequest { optional bytes key = 1; }
@@ -25,3 +26,9 @@ message DeleteResponse {}
 
 message ListRequest {}
 message ListResponse { map<string, string> key_value = 1; }
+
+message ScanRequest {
+  optional bytes prefix = 1;
+  optional uint32 limit = 2;
+}
+message ScanResponse { map<string, string> key_value = 1; }

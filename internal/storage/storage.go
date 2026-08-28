@@ -12,6 +12,7 @@ const (
 
 const (
 	GET ReadType = iota
+	LIST
 	SCAN
 )
 
@@ -25,15 +26,15 @@ type ReadRequest struct {
 	Type   ReadType
 	Key    []byte
 	Prefix []byte
-	Limit  int
+	Limit  uint32
 }
 
-type ListResponse struct {
-	KeyValue map[string]string
+type ReadResponse struct {
+	Value []byte
+	Map   map[string]string
 }
 
 type Storage interface {
 	Write(ctx context.Context, req WriteRequest) error
-	Read(ctx context.Context, req ReadRequest) ([]byte, error)
-	List(ctx context.Context) (ListResponse, error)
+	Read(ctx context.Context, req ReadRequest) (ReadResponse, error)
 }

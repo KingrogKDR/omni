@@ -24,12 +24,12 @@ func (s *Server) Get(ctx context.Context, req *kvpb.GetRequest) (*kvpb.GetRespon
 		Type: storage.GET,
 		Key:  req.Key,
 	}
-	value, err := s.store.Read(ctx, readReq)
+	resp, err := s.store.Read(ctx, readReq)
 	if err != nil {
 		return &kvpb.GetResponse{}, err
 	}
 	return &kvpb.GetResponse{
-		Value: value,
+		Value: resp.Value,
 	}, nil
 }
 
@@ -61,11 +61,29 @@ func (s *Server) Delete(ctx context.Context, req *kvpb.DeleteRequest) (*kvpb.Del
 }
 
 func (s *Server) List(ctx context.Context, req *kvpb.ListRequest) (*kvpb.ListResponse, error) {
-	resp, err := s.store.List(ctx)
+	readReq := storage.ReadRequest{Type: storage.LIST}
+
+	resp, err := s.store.Read(ctx, readReq)
 	if err != nil {
 		return &kvpb.ListResponse{}, err
 	}
 	return &kvpb.ListResponse{
-		KeyValue: resp.KeyValue,
+		KeyValue: resp.Map,
+	}, nil
+}
+
+func (s *Server) Scan(ctx context.Context, req *kvpb.ScanRequest) (*kvpb.ScanResponse, error) {
+	readReq := storage.ReadRequest{
+		Type:   storage.SCAN,
+		Prefix: req.Prefix,
+		Limit:  *req.Limit,
+	}
+
+	resp, err := s.store.Read(ctx, readReq)
+	if err != nil {
+		return &kvpb.ScanResponse{}, err
+	}
+	return &kvpb.ScanResponse{
+		KeyValue: resp.Map,
 	}, nil
 }

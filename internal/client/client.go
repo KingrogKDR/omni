@@ -70,6 +70,18 @@ func (c *Client) List(ctx context.Context) (*kvpb.ListResponse, error) {
 	return resp, nil
 }
 
+func (c *Client) Scan(ctx context.Context, prefix string, limit uint32) (*kvpb.ScanResponse, error) {
+	resp, err := c.rpc.Scan(ctx, &kvpb.ScanRequest{
+		Prefix: []byte(prefix),
+		Limit:  &limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan error: %w", err)
+	}
+
+	return resp, nil
+}
+
 func (c *Client) Close() error {
 	return c.conn.Close()
 }
