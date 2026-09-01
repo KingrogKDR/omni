@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/KingrogKDR/omni/internal/storage"
 	kvpb "github.com/KingrogKDR/omni/proto/gen/kv"
@@ -20,27 +21,17 @@ func NewServer(store storage.Storage) *Server {
 }
 
 func (s *Server) Get(ctx context.Context, req *kvpb.GetRequest) (*kvpb.GetResponse, error) {
-	readReq := storage.ReadRequest{
-		Type: storage.GET,
-		Key:  req.Key,
-	}
-	resp, err := s.store.Read(ctx, readReq)
+	val, err := s.store.Get(ctx, req.Key)
 	if err != nil {
 		return &kvpb.GetResponse{}, err
 	}
 	return &kvpb.GetResponse{
-		Value: resp.Value,
+		Value: val,
 	}, nil
 }
 
 func (s *Server) Put(ctx context.Context, req *kvpb.PutRequest) (*kvpb.PutResponse, error) {
-	writeReq := storage.WriteRequest{
-		Type:  storage.PUT,
-		Key:   req.Key,
-		Value: req.Value,
-	}
-
-	err := s.store.Write(ctx, writeReq)
+	err := s.store.Put(ctx, req.Pair.Key, req.Pair.Value)
 	if err != nil {
 		return &kvpb.PutResponse{}, err
 	}
@@ -48,42 +39,34 @@ func (s *Server) Put(ctx context.Context, req *kvpb.PutRequest) (*kvpb.PutRespon
 }
 
 func (s *Server) Delete(ctx context.Context, req *kvpb.DeleteRequest) (*kvpb.DeleteResponse, error) {
-	writeReq := storage.WriteRequest{
-		Type: storage.DELETE,
-		Key:  req.Key,
-	}
-
-	err := s.store.Write(ctx, writeReq)
+	err := s.store.Delete(ctx, req.Key)
 	if err != nil {
 		return &kvpb.DeleteResponse{}, err
 	}
 	return &kvpb.DeleteResponse{}, nil
 }
 
-func (s *Server) List(ctx context.Context, req *kvpb.ListRequest) (*kvpb.ListResponse, error) {
-	readReq := storage.ReadRequest{Type: storage.LIST}
-
-	resp, err := s.store.Read(ctx, readReq)
-	if err != nil {
-		return &kvpb.ListResponse{}, err
-	}
-	return &kvpb.ListResponse{
-		KeyValue: resp.Map,
-	}, nil
-}
-
-func (s *Server) Scan(ctx context.Context, req *kvpb.ScanRequest) (*kvpb.ScanResponse, error) {
-	readReq := storage.ReadRequest{
-		Type:   storage.SCAN,
-		Prefix: req.Prefix,
-		Limit:  *req.Limit,
+func (s *Server) List(req *kvpb.ListRequest, stream kvpb.Omni_ListServer) error {
+	var limit uint32
+	if req.Limit != nil {
+		limit = *req.Limit
 	}
 
-	resp, err := s.store.Read(ctx, readReq)
-	if err != nil {
-		return &kvpb.ScanResponse{}, err
+	seq, iterErr := s.store.List(stream.Context(), req.Prefix, limit)
+
+	for k, v := range seq {
+		err := stream.Send(&kvpb.ListResponse{
+			Pair: &kvpb.KeyValue{Key: k, Value: v},
+		})
+
+		if err != nil {
+			return fmt.Errorf("list send: %w", err)
+		}
 	}
-	return &kvpb.ScanResponse{
-		KeyValue: resp.Map,
-	}, nil
+
+	if err := iterErr.Err(); err != nil {
+		return fmt.Errorf("list iterrator: %w", err)
+	}
+
+	return nil
 }

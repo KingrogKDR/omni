@@ -33,7 +33,7 @@ type OmniClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
-	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
+	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ListResponse], error)
 	Scan(ctx context.Context, in *ScanRequest, opts ...grpc.CallOption) (*ScanResponse, error)
 }
 
@@ -75,15 +75,24 @@ func (c *omniClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc
 	return out, nil
 }
 
-func (c *omniClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error) {
+func (c *omniClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ListResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListResponse)
-	err := c.cc.Invoke(ctx, Omni_List_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Omni_ServiceDesc.Streams[0], Omni_List_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[ListRequest, ListResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Omni_ListClient = grpc.ServerStreamingClient[ListResponse]
 
 func (c *omniClient) Scan(ctx context.Context, in *ScanRequest, opts ...grpc.CallOption) (*ScanResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -102,7 +111,7 @@ type OmniServer interface {
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	Put(context.Context, *PutRequest) (*PutResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
-	List(context.Context, *ListRequest) (*ListResponse, error)
+	List(*ListRequest, grpc.ServerStreamingServer[ListResponse]) error
 	Scan(context.Context, *ScanRequest) (*ScanResponse, error)
 	mustEmbedUnimplementedOmniServer()
 }
@@ -123,8 +132,8 @@ func (UnimplementedOmniServer) Put(context.Context, *PutRequest) (*PutResponse, 
 func (UnimplementedOmniServer) Delete(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
 }
-func (UnimplementedOmniServer) List(context.Context, *ListRequest) (*ListResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method List not implemented")
+func (UnimplementedOmniServer) List(*ListRequest, grpc.ServerStreamingServer[ListResponse]) error {
+	return status.Error(codes.Unimplemented, "method List not implemented")
 }
 func (UnimplementedOmniServer) Scan(context.Context, *ScanRequest) (*ScanResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Scan not implemented")
@@ -204,23 +213,16 @@ func _Omni_Delete_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Omni_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListRequest)
-	if err := dec(in); err != nil {
-		return nil, err
+func _Omni_List_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ListRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(OmniServer).List(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Omni_List_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OmniServer).List(ctx, req.(*ListRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(OmniServer).List(m, &grpc.GenericServerStream[ListRequest, ListResponse]{ServerStream: stream})
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Omni_ListServer = grpc.ServerStreamingServer[ListResponse]
 
 func _Omni_Scan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ScanRequest)
@@ -260,14 +262,16 @@ var Omni_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Omni_Delete_Handler,
 		},
 		{
-			MethodName: "List",
-			Handler:    _Omni_List_Handler,
-		},
-		{
 			MethodName: "Scan",
 			Handler:    _Omni_Scan_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "List",
+			Handler:       _Omni_List_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "proto/kv.proto",
 }

@@ -1,40 +1,30 @@
 package storage
 
-import "context"
-
-type WriteType int
-type ReadType int
-
-const (
-	PUT WriteType = iota
-	DELETE
+import (
+	"context"
+	"iter"
 )
 
-const (
-	GET ReadType = iota
-	LIST
-	SCAN
-)
-
-type WriteRequest struct {
-	Type  WriteType
-	Key   []byte
-	Value []byte
+type ReadError struct {
+	err error
 }
 
-type ReadRequest struct {
-	Type   ReadType
-	Key    []byte
-	Prefix []byte
-	Limit  uint32
+func (e *ReadError) Err() error { return e.err }
+
+func (e *ReadError) SetErr(err error) { e.err = err }
+
+type Writer interface {
+	Put(context.Context, []byte, []byte) error
+	Delete(context.Context, []byte) error
 }
 
-type ReadResponse struct {
-	Value []byte
-	Map   map[string]string
+type Reader interface {
+	Get(context.Context, []byte) ([]byte, error)
+	List(context.Context, []byte, uint32) (iter.Seq2[[]byte, []byte], *ReadError)
+	// Scan(context.Context, []byte, []byte)
 }
 
 type Storage interface {
-	Write(ctx context.Context, req WriteRequest) error
-	Read(ctx context.Context, req ReadRequest) (ReadResponse, error)
+	Reader
+	Writer
 }

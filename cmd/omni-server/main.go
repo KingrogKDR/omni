@@ -20,7 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error opening store: %v", err)
 	}
-	defer store.DB.Close()
+	defer store.Close()
 
 	omniServer := server.NewServer(store)
 

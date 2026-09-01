@@ -3,12 +3,13 @@ package storage
 import (
 	"context"
 	"fmt"
+	"iter"
 
 	"github.com/dgraph-io/badger"
 )
 
 type BadgerStore struct {
-	DB *badger.DB
+	db *badger.DB
 }
 
 func NewBadgerStore() (*BadgerStore, error) {
@@ -16,97 +17,101 @@ func NewBadgerStore() (*BadgerStore, error) {
 	badger_store, err := badger.Open(opts)
 
 	return &BadgerStore{
-		DB: badger_store,
+		db: badger_store,
 	}, err
 }
 
-func (s *BadgerStore) Read(ctx context.Context, req ReadRequest) (ReadResponse, error) {
-	var resp ReadResponse
-	txErr := s.DB.Update(func(txn *badger.Txn) error {
+func (s *BadgerStore) Get(ctx context.Context, key []byte) ([]byte, error) {
+	var value []byte
+	txErr := s.db.View(func(txn *badger.Txn) error {
 		var err error
-		switch req.Type {
-		case GET:
-			item, err := txn.Get(req.Key)
-			if err != nil {
-				return fmt.Errorf("store get: %w", err)
-			}
-			val, err := item.ValueCopy(nil)
-			if err != nil {
-				return fmt.Errorf("read item: %w", err)
-			}
-			resp.Value = val
-			return nil
-		case LIST:
-			it := txn.NewIterator(badger.DefaultIteratorOptions)
-			defer it.Close()
 
-			resp.Map = make(map[string]string, 1)
-			for it.Rewind(); it.Valid(); it.Next() {
-				item := it.Item()
-				key := item.Key()
-				err := item.Value(func(val []byte) error {
-					resp.Map[string(key)] = string(val)
-					return nil
-				})
-				if err != nil {
-					return err
-				}
-			}
-		case SCAN:
+		item, err := txn.Get(key)
+		if err != nil {
+			return fmt.Errorf("store get: %w", err)
+		}
+		val, err := item.ValueCopy(nil)
+		if err != nil {
+			return fmt.Errorf("read item: %w", err)
+		}
+		value = val
+		return nil
+	})
+	if txErr != nil {
+		return nil, fmt.Errorf("transaction (GET): %w", txErr)
+	}
+	return value, nil
+}
+
+func (s *BadgerStore) Put(ctx context.Context, key, value []byte) error {
+	txErr := s.db.Update(func(txn *badger.Txn) error {
+		err := txn.Set(key, value)
+		if err != nil {
+			return fmt.Errorf("store put: %w", err)
+		}
+		return nil
+	})
+	if txErr != nil {
+		return fmt.Errorf("transaction (PUT): %w", txErr)
+	}
+	return nil
+}
+
+func (s *BadgerStore) Delete(ctx context.Context, key []byte) error {
+	txErr := s.db.Update(func(txn *badger.Txn) error {
+		err := txn.Delete(key)
+		if err != nil {
+			return fmt.Errorf("store delete: %w", err)
+		}
+		return nil
+	})
+	if txErr != nil {
+		return fmt.Errorf("transaction (DELETE): %w", txErr)
+	}
+	return nil
+}
+
+func (s *BadgerStore) List(ctx context.Context, prefix []byte, limit uint32) (iter.Seq2[[]byte, []byte], *ReadError) {
+	readErr := &ReadError{}
+	seq := func(yield func(k, v []byte) bool) {
+		txErr := s.db.View(func(txn *badger.Txn) error {
 			opt := badger.DefaultIteratorOptions
-			opt.Prefix = req.Prefix
+			opt.Prefix = prefix
+
 			it := txn.NewIterator(opt)
 			defer it.Close()
 
-			resp.Map = make(map[string]string, 1)
-			limit := uint32(0)
-			for it.Rewind(); it.Valid(); it.Next() {
-				if limit >= req.Limit {
-					break
+			var count uint32
+			for it.Rewind(); it.Valid() && (limit == 0 || count < limit); it.Next() {
+				if ctx.Err() != nil {
+					return fmt.Errorf("scan: %w", ctx.Err())
 				}
+
 				item := it.Item()
-				key := item.Key()
-				err := item.Value(func(val []byte) error {
-					resp.Map[string(key)] = string(val)
-					return nil
-				})
+				key := item.KeyCopy(nil)
+				val, err := item.ValueCopy(nil)
 				if err != nil {
-					return err
+					return fmt.Errorf("scan value copy: %w", err)
 				}
-				limit += 1
+
+				// the loop exited normally
+				// return in place because we must not call yield again after it's returned false, otherwise it causes runtime panic
+				if !yield(key, val) {
+					return nil
+				}
+
+				count++
 			}
-		default:
-			err = fmt.Errorf("Not a valid read method\n")
+
+			return nil
+		})
+		if txErr != nil {
+			readErr.err = fmt.Errorf("transaction (LIST): %w", txErr)
 		}
-		return err
-	})
-	if txErr != nil {
-		return ReadResponse{}, fmt.Errorf("transaction read: %w", txErr)
 	}
-	return resp, nil
+	return seq, readErr
 }
 
-func (s *BadgerStore) Write(ctx context.Context, req WriteRequest) error {
-	txErr := s.DB.Update(func(txn *badger.Txn) error {
-		var err error
-		switch req.Type {
-		case PUT:
-			err = txn.Set(req.Key, req.Value)
-			if err != nil {
-				return fmt.Errorf("store put: %w", err)
-			}
-		case DELETE:
-			err = txn.Delete(req.Key)
-			if err != nil {
-				return fmt.Errorf("store delete: %w", err)
-			}
-		default:
-			err = fmt.Errorf("Not a valid write method\n")
-		}
-		return err
-	})
-	if txErr != nil {
-		return fmt.Errorf("transaction write: %w", txErr)
-	}
-	return nil
+func (s *BadgerStore) Close() error {
+	return s.db.Close()
 }
