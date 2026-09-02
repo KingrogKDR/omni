@@ -66,14 +66,8 @@ func (c *Client) Delete(ctx context.Context, key []byte) (*kvpb.DeleteResponse, 
 	return resp, nil
 }
 
-func (c *Client) List(ctx context.Context, prefix []byte, limit uint32) (iter.Seq2[[]byte, []byte], *storage.ReadError) {
+func (c *Client) list(ctx context.Context, req *kvpb.ListRequest) (iter.Seq2[[]byte, []byte], *storage.ReadError) {
 	readErr := &storage.ReadError{}
-
-	req := &kvpb.ListRequest{Prefix: prefix}
-	if limit > 0 {
-		req.Limit = &limit
-	}
-
 	seq := func(yield func(k, v []byte) bool) {
 		stream, err := c.rpc.List(ctx, req)
 		if err != nil {
@@ -98,17 +92,44 @@ func (c *Client) List(ctx context.Context, prefix []byte, limit uint32) (iter.Se
 	return seq, readErr
 }
 
-// func (c *Client) Scan(ctx context.Context, prefix string, limit uint32) (*kvpb.ScanResponse, error) {
-// 	resp, err := c.rpc.Scan(ctx, &kvpb.ScanRequest{
-// 		Prefix: []byte(prefix),
-// 		Limit:  &limit,
-// 	})
-// 	if err != nil {
-// 		return nil, fmt.Errorf("scan error: %w", err)
-// 	}
+func (c *Client) List(ctx context.Context, prefix []byte, limit uint32) (iter.Seq2[[]byte, []byte], *storage.ReadError) {
+	req := &kvpb.ListRequest{Prefix: prefix}
+	if limit > 0 {
+		req.Limit = &limit
+	}
+	return c.list(ctx, req)
+}
 
-// 	return resp, nil
-// }
+func (c *Client) Scan(ctx context.Context, start, end []byte) (iter.Seq2[[]byte, []byte], *storage.ReadError) {
+	readErr := &storage.ReadError{}
+	seq := func(yield func(k, v []byte) bool) {
+		stream, err := c.rpc.Scan(ctx, &kvpb.ScanRequest{
+			Start: start,
+			End:   end,
+		})
+		if err != nil {
+			readErr.SetErr(fmt.Errorf("scan error: %w", err))
+			return
+		}
+
+		for {
+			resp, err := stream.Recv()
+
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			if err != nil {
+				readErr.SetErr(fmt.Errorf("scan: receiving: %w", err))
+				return
+			}
+			if !yield(resp.Pair.Key, resp.Pair.Value) {
+				return
+			}
+		}
+	}
+
+	return seq, readErr
+}
 
 func (c *Client) Close() error {
 	return c.conn.Close()

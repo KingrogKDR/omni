@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"iter"
@@ -84,14 +85,14 @@ func (s *BadgerStore) List(ctx context.Context, prefix []byte, limit uint32) (it
 			var count uint32
 			for it.Rewind(); it.Valid() && (limit == 0 || count < limit); it.Next() {
 				if ctx.Err() != nil {
-					return fmt.Errorf("scan: %w", ctx.Err())
+					return fmt.Errorf("list: %w", ctx.Err())
 				}
 
 				item := it.Item()
 				key := item.KeyCopy(nil)
 				val, err := item.ValueCopy(nil)
 				if err != nil {
-					return fmt.Errorf("scan value copy: %w", err)
+					return fmt.Errorf("list value copy: %w", err)
 				}
 
 				// the loop exited normally
@@ -109,6 +110,45 @@ func (s *BadgerStore) List(ctx context.Context, prefix []byte, limit uint32) (it
 			readErr.err = fmt.Errorf("transaction (LIST): %w", txErr)
 		}
 	}
+	return seq, readErr
+}
+
+func (s *BadgerStore) Scan(ctx context.Context, start, end []byte) (iter.Seq2[[]byte, []byte], *ReadError) {
+	readErr := &ReadError{}
+	seq := func(yield func(k, v []byte) bool) {
+		txErr := s.db.View(func(txn *badger.Txn) error {
+			opt := badger.DefaultIteratorOptions
+			it := txn.NewIterator(opt)
+			defer it.Close()
+
+			for it.Seek(start); it.Valid(); it.Next() {
+				if ctx.Err() != nil {
+					return fmt.Errorf("scan: %w", ctx.Err())
+				}
+
+				item := it.Item()
+				key := item.KeyCopy(nil)
+
+				if end != nil && bytes.Compare(key, end) >= 0 {
+					return nil
+				}
+
+				val, err := item.ValueCopy(nil)
+				if err != nil {
+					return fmt.Errorf("scan value copy: %w", err)
+				}
+
+				if !yield(key, val) {
+					return nil
+				}
+			}
+			return nil
+		})
+		if txErr != nil {
+			readErr.err = fmt.Errorf("transaction (SCAN): %w", txErr)
+		}
+	}
+
 	return seq, readErr
 }
 

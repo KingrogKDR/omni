@@ -419,6 +419,8 @@ func (x *ListResponse) GetPair() *KeyValue {
 
 type ScanRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Start         []byte                 `protobuf:"bytes,1,opt,name=start,proto3,oneof" json:"start,omitempty"`
+	End           []byte                 `protobuf:"bytes,2,opt,name=end,proto3,oneof" json:"end,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -453,9 +455,23 @@ func (*ScanRequest) Descriptor() ([]byte, []int) {
 	return file_proto_kv_proto_rawDescGZIP(), []int{9}
 }
 
+func (x *ScanRequest) GetStart() []byte {
+	if x != nil {
+		return x.Start
+	}
+	return nil
+}
+
+func (x *ScanRequest) GetEnd() []byte {
+	if x != nil {
+		return x.End
+	}
+	return nil
+}
+
 type ScanResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Pairs         []*KeyValue            `protobuf:"bytes,1,rep,name=pairs,proto3" json:"pairs,omitempty"`
+	Pair          *KeyValue              `protobuf:"bytes,1,opt,name=pair,proto3" json:"pair,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -490,9 +506,9 @@ func (*ScanResponse) Descriptor() ([]byte, []int) {
 	return file_proto_kv_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *ScanResponse) GetPairs() []*KeyValue {
+func (x *ScanResponse) GetPair() *KeyValue {
 	if x != nil {
-		return x.Pairs
+		return x.Pair
 	}
 	return nil
 }
@@ -528,16 +544,20 @@ const file_proto_kv_proto_rawDesc = "" +
 	"\a_prefixB\b\n" +
 	"\x06_limit\"0\n" +
 	"\fListResponse\x12 \n" +
-	"\x04pair\x18\x01 \x01(\v2\f.kv.KeyValueR\x04pair\"\r\n" +
-	"\vScanRequest\"2\n" +
-	"\fScanResponse\x12\"\n" +
-	"\x05pairs\x18\x01 \x03(\v2\f.kv.KeyValueR\x05pairs2\xe9\x01\n" +
+	"\x04pair\x18\x01 \x01(\v2\f.kv.KeyValueR\x04pair\"Q\n" +
+	"\vScanRequest\x12\x19\n" +
+	"\x05start\x18\x01 \x01(\fH\x00R\x05start\x88\x01\x01\x12\x15\n" +
+	"\x03end\x18\x02 \x01(\fH\x01R\x03end\x88\x01\x01B\b\n" +
+	"\x06_startB\x06\n" +
+	"\x04_end\"0\n" +
+	"\fScanResponse\x12 \n" +
+	"\x04pair\x18\x01 \x01(\v2\f.kv.KeyValueR\x04pair2\xeb\x01\n" +
 	"\x04Omni\x12(\n" +
 	"\x03Get\x12\x0e.kv.GetRequest\x1a\x0f.kv.GetResponse\"\x00\x12(\n" +
 	"\x03Put\x12\x0e.kv.PutRequest\x1a\x0f.kv.PutResponse\"\x00\x121\n" +
 	"\x06Delete\x12\x11.kv.DeleteRequest\x1a\x12.kv.DeleteResponse\"\x00\x12-\n" +
-	"\x04List\x12\x0f.kv.ListRequest\x1a\x10.kv.ListResponse\"\x000\x01\x12+\n" +
-	"\x04Scan\x12\x0f.kv.ScanRequest\x1a\x10.kv.ScanResponse\"\x00B\x0eZ\fproto/gen/kvb\x06proto3"
+	"\x04List\x12\x0f.kv.ListRequest\x1a\x10.kv.ListResponse\"\x000\x01\x12-\n" +
+	"\x04Scan\x12\x0f.kv.ScanRequest\x1a\x10.kv.ScanResponse\"\x000\x01B\x0eZ\fproto/gen/kvb\x06proto3"
 
 var (
 	file_proto_kv_proto_rawDescOnce sync.Once
@@ -568,7 +588,7 @@ var file_proto_kv_proto_goTypes = []any{
 var file_proto_kv_proto_depIdxs = []int32{
 	0,  // 0: kv.PutRequest.pair:type_name -> kv.KeyValue
 	0,  // 1: kv.ListResponse.pair:type_name -> kv.KeyValue
-	0,  // 2: kv.ScanResponse.pairs:type_name -> kv.KeyValue
+	0,  // 2: kv.ScanResponse.pair:type_name -> kv.KeyValue
 	1,  // 3: kv.Omni.Get:input_type -> kv.GetRequest
 	3,  // 4: kv.Omni.Put:input_type -> kv.PutRequest
 	5,  // 5: kv.Omni.Delete:input_type -> kv.DeleteRequest
@@ -596,6 +616,7 @@ func file_proto_kv_proto_init() {
 	file_proto_kv_proto_msgTypes[2].OneofWrappers = []any{}
 	file_proto_kv_proto_msgTypes[5].OneofWrappers = []any{}
 	file_proto_kv_proto_msgTypes[7].OneofWrappers = []any{}
+	file_proto_kv_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

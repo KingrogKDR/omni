@@ -21,7 +21,7 @@ type Writer interface {
 type Reader interface {
 	Get(context.Context, []byte) ([]byte, error)
 	List(context.Context, []byte, uint32) (iter.Seq2[[]byte, []byte], *ReadError)
-	// Scan(context.Context, []byte, []byte)
+	Scan(context.Context, []byte, []byte) (iter.Seq2[[]byte, []byte], *ReadError)
 }
 
 type Storage interface {

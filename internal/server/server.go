@@ -60,12 +60,45 @@ func (s *Server) List(req *kvpb.ListRequest, stream kvpb.Omni_ListServer) error 
 		})
 
 		if err != nil {
-			return fmt.Errorf("list send: %w", err)
+			return fmt.Errorf("stream send (LIST): %w", err)
 		}
 	}
 
 	if err := iterErr.Err(); err != nil {
 		return fmt.Errorf("list iterrator: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Server) Scan(req *kvpb.ScanRequest, stream kvpb.Omni_ScanServer) error {
+	var start []byte
+	if req.Start != nil {
+		start = req.Start
+	}
+
+	var end []byte
+	if req.End != nil {
+		end = req.End
+	}
+
+	seq, iterErr := s.store.Scan(stream.Context(), start, end)
+
+	for k, v := range seq {
+		err := stream.Send(&kvpb.ScanResponse{
+			Pair: &kvpb.KeyValue{
+				Key:   k,
+				Value: v,
+			},
+		})
+
+		if err != nil {
+			return fmt.Errorf("stream send (SCAN): %w", err)
+		}
+	}
+
+	if err := iterErr.Err(); err != nil {
+		return fmt.Errorf("scan iterrator: %w", err)
 	}
 
 	return nil
