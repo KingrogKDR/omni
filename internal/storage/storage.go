@@ -3,8 +3,6 @@ package storage
 import (
 	"context"
 	"iter"
-
-	"github.com/KingrogKDR/omni/internal/utils"
 )
 
 // StorageReader provides read-only access to a storage snapshot.
@@ -12,17 +10,15 @@ import (
 // The caller is responsible for closing the reader when it is no longer
 // needed. Closing releases resources associated with the reader.
 type StorageReader interface {
-	GetCF(ctx context.Context, cf []byte, key []byte) ([]byte, utils.StorageError)
+	GetCF(ctx context.Context, cf, key []byte) ([]byte, error)
 
 	// IterCF returns a sequence of key-value pairs from the specified
 	// column family.
 	//
 	// The sequence is limited to at most limit entries. A limit of zero
-	// means no limit.
-	//
-	// The caller is responsible for consuming the sequence and handling
+	// means no limit. The caller is responsible for consuming the sequence and handling
 	// any error returned by the iterator.
-	IterCF(ctx context.Context, cf []byte, limit uint32) (iter.Seq2[[]byte, []byte], *utils.StorageError)
+	IterCF(ctx context.Context, cf []byte, limit uint32) (iter.Seq2[[]byte, []byte], *error)
 	Close()
 }
 
@@ -38,12 +34,12 @@ type WriteOp interface {
 type PutOp struct {
 	Key []byte
 	Val []byte
-	Cf  []byte
+	CF  []byte
 }
 
 type DeleteOp struct {
 	Key []byte
-	Cf  []byte
+	CF  []byte
 }
 
 func (PutOp) isWriteOp()    {}
@@ -54,6 +50,8 @@ func (DeleteOp) isWriteOp() {}
 // It separates reading from writing: Reader returns a reader for
 // read operations, while Write applies a batch of write operations.
 type Storage interface {
-	Reader(ctx context.Context) (StorageReader, utils.StorageError)
-	Write(ctx context.Context, batch []WriteOp) utils.StorageError
+	Start()
+	Reader(ctx context.Context) (StorageReader, error)
+	Write(ctx context.Context, batch []WriteOp) error
+	Stop()
 }
