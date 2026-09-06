@@ -6,8 +6,11 @@ import (
 	"github.com/KingrogKDR/omni/internal/storage"
 )
 
+// The caller is responsible for closing the engine when it is no longer
+// needed. Closing releases resources associated with the engine.
 type Engine interface {
-	NewReader(ctx context.Context) (storage.StorageReader, error)
+	Start() error
+	Read(ctx context.Context, op storage.ReadOp) ([]byte, error)
 	WriteBatch(ctx context.Context, ops []storage.WriteOp) error
 	Close() error
 }
@@ -16,18 +19,22 @@ type SingleStorage struct {
 	engine Engine
 }
 
-func NewSingleStorage() *SingleStorage {
-	return &SingleStorage{}
+func NewSingleStorage(engine Engine) *SingleStorage {
+	return &SingleStorage{
+		engine: engine,
+	}
 }
 
 func (s *SingleStorage) Start() {}
 
-func (s *SingleStorage) Reader(ctx context.Context) (storage.StorageReader, error) {
-	return s.engine.NewReader(ctx)
+func (s *SingleStorage) Reader(ctx context.Context, operation storage.ReadOp) ([]byte, error) {
+	return s.engine.Read(ctx, operation)
 }
 
-func (s *SingleStorage) Write(ctx context.Context, batch []storage.WriteOp) error {
+func (s *SingleStorage) Writer(ctx context.Context, batch []storage.WriteOp) error {
 	return s.engine.WriteBatch(ctx, batch)
 }
 
-func (s *SingleStorage) Stop() {}
+func (s *SingleStorage) Stop() {
+	_ = s.engine.Close()
+}

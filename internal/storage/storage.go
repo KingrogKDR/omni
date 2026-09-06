@@ -2,25 +2,33 @@ package storage
 
 import (
 	"context"
-	"iter"
 )
 
-// StorageReader provides read-only access to a storage snapshot.
-//
-// The caller is responsible for closing the reader when it is no longer
-// needed. Closing releases resources associated with the reader.
-type StorageReader interface {
-	GetCF(ctx context.Context, cf, key []byte) ([]byte, error)
-
-	// IterCF returns a sequence of key-value pairs from the specified
-	// column family.
-	//
-	// The sequence is limited to at most limit entries. A limit of zero
-	// means no limit. The caller is responsible for consuming the sequence and handling
-	// any error returned by the iterator.
-	IterCF(ctx context.Context, cf []byte, limit uint32) (iter.Seq2[[]byte, []byte], *error)
-	Close()
+// ReadOp provides read-only access to a storage snapshot.
+type ReadOp interface {
+	isReadOp()
 }
+
+type Get struct {
+	Cf  []byte
+	Key []byte
+}
+
+type PrefixScan struct {
+	Cf     []byte
+	Key    []byte
+	Prefix []byte
+}
+
+type RangeScan struct {
+	Cf    []byte
+	Start []byte
+	End   []byte
+}
+
+func (Get) isReadOp()        {}
+func (PrefixScan) isReadOp() {}
+func (RangeScan) isReadOp()  {}
 
 // WriteOp represents a supported write operation.
 //
@@ -31,27 +39,27 @@ type WriteOp interface {
 	isWriteOp()
 }
 
-type PutOp struct {
+type Put struct {
+	CF  []byte
 	Key []byte
 	Val []byte
-	CF  []byte
 }
 
-type DeleteOp struct {
+type Delete struct {
+	CF  []byte
 	Key []byte
-	CF  []byte
 }
 
-func (PutOp) isWriteOp()    {}
-func (DeleteOp) isWriteOp() {}
+func (Put) isWriteOp()    {}
+func (Delete) isWriteOp() {}
 
 // Storage provides access to the storage engine.
 //
 // It separates reading from writing: Reader returns a reader for
-// read operations, while Write applies a batch of write operations.
+// read operations, while Writer applies a batch of write operations.
 type Storage interface {
 	Start()
-	Reader(ctx context.Context) (StorageReader, error)
-	Write(ctx context.Context, batch []WriteOp) error
+	Reader(ctx context.Context, op ReadOp) ([]byte, error)
+	Writer(ctx context.Context, batch []WriteOp) error
 	Stop()
 }
