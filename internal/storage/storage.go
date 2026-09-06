@@ -16,7 +16,6 @@ type Get struct {
 
 type PrefixScan struct {
 	Cf     []byte
-	Key    []byte
 	Prefix []byte
 }
 
@@ -29,6 +28,16 @@ type RangeScan struct {
 func (Get) isReadOp()        {}
 func (PrefixScan) isReadOp() {}
 func (RangeScan) isReadOp()  {}
+
+type IteratorOptions struct {
+	Limit   uint32
+	Reverse bool
+}
+
+type Pair struct {
+	Key []byte
+	Val []byte
+}
 
 // WriteOp represents a supported write operation.
 //
@@ -59,7 +68,7 @@ func (Delete) isWriteOp() {}
 // read operations, while Writer applies a batch of write operations.
 type Storage interface {
 	Start()
-	Reader(ctx context.Context, op ReadOp) ([]byte, error)
+	Reader(ctx context.Context, op ReadOp, opts IteratorOptions) ([]Pair, error)
 	Writer(ctx context.Context, batch []WriteOp) error
 	Stop()
 }
