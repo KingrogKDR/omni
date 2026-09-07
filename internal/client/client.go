@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"iter"
 
-	"github.com/KingrogKDR/omni/internal/storage"
 	kvpb "github.com/KingrogKDR/omni/proto/gen/kv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+var ErrKeyNotFound = errors.New("key not found")
 
 type Client struct {
 	rpc  kvpb.OmniClient
@@ -31,104 +30,63 @@ func NewClient(serverAddr string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Put(ctx context.Context, key, value []byte) (*kvpb.PutResponse, error) {
-	resp, err := c.rpc.Put(ctx, &kvpb.PutRequest{
-		Pair: &kvpb.KeyValue{
-			Key: key,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("put error: %w", err)
-	}
-
-	return resp, nil
+func NewClientFromConn(conn *grpc.ClientConn) *Client {
+	return &Client{rpc: kvpb.NewOmniClient(conn), conn: conn}
 }
 
-func (c *Client) Get(ctx context.Context, key []byte) (*kvpb.GetResponse, error) {
+func (c *Client) Put(ctx context.Context, cf, key, value []byte) error {
+	resp, err := c.rpc.Put(ctx, &kvpb.PutRequest{
+		Cf:  cf,
+		Key: key,
+		Val: value,
+	})
+	if err != nil {
+		return fmt.Errorf("put error: %w", err)
+	}
+	if !resp.Success {
+		return fmt.Errorf("put failed: server reported unsuccessful write")
+	}
+
+	return nil
+}
+
+func (c *Client) Get(ctx context.Context, cf, key []byte) ([]byte, error) {
 	resp, err := c.rpc.Get(ctx, &kvpb.GetRequest{
+		Cf:  cf,
 		Key: key,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("get error: %w", err)
 	}
 
-	return resp, nil
+	if resp.NotFound {
+		return nil, ErrKeyNotFound
+	}
+
+	return resp.Val, nil
 }
 
-func (c *Client) Delete(ctx context.Context, key []byte) (*kvpb.DeleteResponse, error) {
+func (c *Client) Delete(ctx context.Context, cf, key []byte) error {
 	resp, err := c.rpc.Delete(ctx, &kvpb.DeleteRequest{
+		Cf:  cf,
 		Key: key,
 	})
+	if !resp.Success {
+		return fmt.Errorf("delete error: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) Scan(ctx context.Context, cf []byte, scanOptions *kvpb.ScanOptions) ([]*kvpb.KeyValue, error) {
+	resp, err := c.rpc.Scan(ctx, &kvpb.ScanRequest{
+		Cf:          cf,
+		ScanOptions: scanOptions,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("delete error: %w", err)
+		return nil, fmt.Errorf("scan error: %w", err)
 	}
-
-	return resp, nil
-}
-
-func (c *Client) list(ctx context.Context, req *kvpb.ListRequest) (iter.Seq2[[]byte, []byte], *storage.ReadError) {
-	readErr := &storage.ReadError{}
-	seq := func(yield func(k, v []byte) bool) {
-		stream, err := c.rpc.List(ctx, req)
-		if err != nil {
-			readErr.SetErr(fmt.Errorf("list opening stream: %w", err))
-			return
-		}
-		for {
-			resp, err := stream.Recv()
-			if errors.Is(err, io.EOF) {
-				return
-			}
-			if err != nil {
-				readErr.SetErr(fmt.Errorf("list: receiving: %w", err))
-				return
-			}
-			if !yield(resp.Pair.Key, resp.Pair.Value) {
-				return
-			}
-		}
-	}
-
-	return seq, readErr
-}
-
-func (c *Client) List(ctx context.Context, prefix []byte, limit uint32) (iter.Seq2[[]byte, []byte], *storage.ReadError) {
-	req := &kvpb.ListRequest{Prefix: prefix}
-	if limit > 0 {
-		req.Limit = &limit
-	}
-	return c.list(ctx, req)
-}
-
-func (c *Client) Scan(ctx context.Context, start, end []byte) (iter.Seq2[[]byte, []byte], *storage.ReadError) {
-	readErr := &storage.ReadError{}
-	seq := func(yield func(k, v []byte) bool) {
-		stream, err := c.rpc.Scan(ctx, &kvpb.ScanRequest{
-			Start: start,
-			End:   end,
-		})
-		if err != nil {
-			readErr.SetErr(fmt.Errorf("scan error: %w", err))
-			return
-		}
-
-		for {
-			resp, err := stream.Recv()
-
-			if errors.Is(err, io.EOF) {
-				return
-			}
-			if err != nil {
-				readErr.SetErr(fmt.Errorf("scan: receiving: %w", err))
-				return
-			}
-			if !yield(resp.Pair.Key, resp.Pair.Value) {
-				return
-			}
-		}
-	}
-
-	return seq, readErr
+	return resp.Pairs, nil
 }
 
 func (c *Client) Close() error {

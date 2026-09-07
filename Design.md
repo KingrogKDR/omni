@@ -4,9 +4,7 @@ Everything related to the design decisions made keeping in mind the tradeoffs an
 
 ## The network layer
 
-- Wire format: Protobuf
-
-#### Context
+### Wire format: Protobuf
 
 Omni nodes exchange messages over the network. These nodes won't always run identical binary versions at the same time. The format needs version mismatches to fail immediately at the boundary and not pass silently, corrupting application logic.
 
@@ -41,3 +39,5 @@ Still there do exist some tradeoffs to be aware of:
 Yet Protobuf wins in both safety and speed for Omni.
 
 Full reasoning in the [linked post](https://kingrogkdr.github.io/post.html?slug=omni-post-1)
+
+### Network Protocol: gRPC

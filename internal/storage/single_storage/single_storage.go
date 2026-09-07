@@ -1,32 +1,42 @@
-package SingleStorage
+package singleStorage
 
 import (
 	"context"
+	"log"
 
 	"github.com/KingrogKDR/omni/internal/storage"
+	"github.com/KingrogKDR/omni/internal/utils"
 )
 
 // The caller is responsible for closing the engine when it is no longer needed
 type Engine interface {
-	Read(ctx context.Context, op storage.ReadOp) ([]storage.Pair, error)
 	WriteBatch(ctx context.Context, ops []storage.WriteOp) error
+	NewReader(ctx context.Context) (storage.StorageReader, error)
 	Close() error
 }
 
 type SingleStorage struct {
 	engine Engine
+	path   string
 }
 
-func NewSingleStorage(engine Engine) *SingleStorage {
+func NewSingleStorage(path string) *SingleStorage {
 	return &SingleStorage{
-		engine: engine,
+		path: path,
 	}
 }
 
-func (s *SingleStorage) Start() {}
+func (s *SingleStorage) Start() error {
+	engine, err := utils.NewBadgerEngine(s.path)
+	if err != nil {
+		return err
+	}
+	s.engine = engine
+	return nil
+}
 
-func (s *SingleStorage) Reader(ctx context.Context, operation storage.ReadOp) ([]storage.Pair, error) {
-	return s.engine.Read(ctx, operation)
+func (s *SingleStorage) Reader(ctx context.Context) (storage.StorageReader, error) {
+	return s.engine.NewReader(ctx)
 }
 
 func (s *SingleStorage) Writer(ctx context.Context, batch []storage.WriteOp) error {
@@ -34,5 +44,7 @@ func (s *SingleStorage) Writer(ctx context.Context, batch []storage.WriteOp) err
 }
 
 func (s *SingleStorage) Stop() {
-	_ = s.engine.Close()
+	if err := s.engine.Close(); err != nil {
+		log.Println("engine close error:", err)
+	}
 }

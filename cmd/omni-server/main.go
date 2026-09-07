@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/KingrogKDR/omni/internal/server"
-	"github.com/KingrogKDR/omni/internal/storage"
+	singleStorage "github.com/KingrogKDR/omni/internal/storage/single_storage"
 	kvpb "github.com/KingrogKDR/omni/proto/gen/kv"
 	"google.golang.org/grpc"
 )
@@ -16,11 +16,11 @@ import (
 const ServerDefaultAddr string = "localhost:28051"
 
 func main() {
-	store, err := storage.NewBadgerStore()
-	if err != nil {
+	store := singleStorage.NewSingleStorage("./data")
+	if err := store.Start(); err != nil {
 		log.Fatalf("Error opening store: %v", err)
 	}
-	defer store.Close()
+	defer store.Stop()
 
 	omniServer := server.NewServer(store)
 

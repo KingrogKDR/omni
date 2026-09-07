@@ -2,34 +2,22 @@ package storage
 
 import (
 	"context"
+	"errors"
 )
 
-// ReadOp provides read-only access to a storage snapshot.
-type ReadOp interface {
-	isReadOp()
+var ErrKeyNotFound = errors.New("key not found")
+
+// StorageReader provides read-only access to a storage snapshot.
+type StorageReader interface {
+	GetCF(cf, key []byte) ([]byte, error)
+	IterCF(ctx context.Context, cf []byte, opts ScanOptions) ([]Pair, error)
+	Close()
 }
 
-type Get struct {
-	Cf  []byte
-	Key []byte
-}
-
-type PrefixScan struct {
-	Cf     []byte
-	Prefix []byte
-}
-
-type RangeScan struct {
-	Cf    []byte
-	Start []byte
-	End   []byte
-}
-
-func (Get) isReadOp()        {}
-func (PrefixScan) isReadOp() {}
-func (RangeScan) isReadOp()  {}
-
-type IteratorOptions struct {
+type ScanOptions struct {
+	Prefix  []byte
+	Start   []byte
+	End     []byte
 	Limit   uint32
 	Reverse bool
 }
@@ -67,8 +55,8 @@ func (Delete) isWriteOp() {}
 // It separates reading from writing: Reader returns a reader for
 // read operations, while Writer applies a batch of write operations.
 type Storage interface {
-	Start()
-	Reader(ctx context.Context, op ReadOp, opts IteratorOptions) ([]Pair, error)
+	Start() error
+	Reader(ctx context.Context) (StorageReader, error)
 	Writer(ctx context.Context, batch []WriteOp) error
 	Stop()
 }

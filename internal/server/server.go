@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/KingrogKDR/omni/internal/storage"
 	kvpb "github.com/KingrogKDR/omni/proto/gen/kv"
@@ -21,85 +21,85 @@ func NewServer(store storage.Storage) *Server {
 }
 
 func (s *Server) Get(ctx context.Context, req *kvpb.GetRequest) (*kvpb.GetResponse, error) {
-	val, err := s.store.Get(ctx, req.Key)
+	reader, err := s.store.Reader(ctx)
 	if err != nil {
-		return &kvpb.GetResponse{}, err
+		return nil, err
 	}
+	defer reader.Close()
+
+	val, err := reader.GetCF(req.Cf, req.Key)
+	if errors.Is(err, storage.ErrKeyNotFound) {
+		return &kvpb.GetResponse{NotFound: true}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	return &kvpb.GetResponse{
-		Value: val,
+		Val: val,
 	}, nil
 }
 
 func (s *Server) Put(ctx context.Context, req *kvpb.PutRequest) (*kvpb.PutResponse, error) {
-	err := s.store.Put(ctx, req.Pair.Key, req.Pair.Value)
-	if err != nil {
-		return &kvpb.PutResponse{}, err
+	batch := make([]storage.WriteOp, 1)
+	batch[0] = storage.Put{
+		CF:  req.Cf,
+		Key: req.Key,
+		Val: req.Val,
 	}
-	return &kvpb.PutResponse{}, nil
+	err := s.store.Writer(ctx, batch)
+	if err != nil {
+		return nil, err
+	}
+	return &kvpb.PutResponse{Success: true}, nil
 }
 
 func (s *Server) Delete(ctx context.Context, req *kvpb.DeleteRequest) (*kvpb.DeleteResponse, error) {
-	err := s.store.Delete(ctx, req.Key)
+	batch := make([]storage.WriteOp, 1)
+	batch[0] = storage.Delete{
+		CF:  req.Cf,
+		Key: req.Key,
+	}
+	err := s.store.Writer(ctx, batch)
 	if err != nil {
-		return &kvpb.DeleteResponse{}, err
+		return nil, err
 	}
-	return &kvpb.DeleteResponse{}, nil
+	return &kvpb.DeleteResponse{Success: true}, nil
 }
 
-func (s *Server) List(req *kvpb.ListRequest, stream kvpb.Omni_ListServer) error {
-	var limit uint32
-	if req.Limit != nil {
-		limit = *req.Limit
+func (s *Server) Scan(ctx context.Context, req *kvpb.ScanRequest) (*kvpb.ScanResponse, error) {
+	so := req.GetScanOptions() // nil-safe even if req.ScanOptions is nil
+
+	opts := storage.ScanOptions{
+		Prefix:  so.GetPrefix(),
+		Start:   so.GetStart(),
+		End:     so.GetEnd(),
+		Limit:   so.GetLimit(),
+		Reverse: so.GetReverse(),
 	}
 
-	seq, iterErr := s.store.List(stream.Context(), req.Prefix, limit)
+	reader, err := s.store.Reader(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
 
-	for k, v := range seq {
-		err := stream.Send(&kvpb.ListResponse{
-			Pair: &kvpb.KeyValue{Key: k, Value: v},
+	pairs, err := reader.IterCF(ctx, req.Cf, opts)
+
+	if err != nil {
+		return nil, err
+	}
+
+	kvPairs := make([]*kvpb.KeyValue, 0, len(pairs))
+	for _, p := range pairs {
+		kvPairs = append(kvPairs, &kvpb.KeyValue{
+			Key:   p.Key,
+			Value: p.Val,
 		})
-
-		if err != nil {
-			return fmt.Errorf("stream send (LIST): %w", err)
-		}
 	}
 
-	if err := iterErr.Err(); err != nil {
-		return fmt.Errorf("list iterrator: %w", err)
-	}
+	return &kvpb.ScanResponse{
+		Pairs: kvPairs,
+	}, nil
 
-	return nil
-}
-
-func (s *Server) Scan(req *kvpb.ScanRequest, stream kvpb.Omni_ScanServer) error {
-	var start []byte
-	if req.Start != nil {
-		start = req.Start
-	}
-
-	var end []byte
-	if req.End != nil {
-		end = req.End
-	}
-
-	seq, iterErr := s.store.Scan(stream.Context(), start, end)
-
-	for k, v := range seq {
-		err := stream.Send(&kvpb.ScanResponse{
-			Pair: &kvpb.KeyValue{
-				Key:   k,
-				Value: v,
-			},
-		})
-
-		if err != nil {
-			return fmt.Errorf("stream send (SCAN): %w", err)
-		}
-	}
-
-	if err := iterErr.Err(); err != nil {
-		return fmt.Errorf("scan iterrator: %w", err)
-	}
-
-	return nil
 }
