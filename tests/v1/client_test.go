@@ -6,10 +6,10 @@ import (
 	"net"
 	"testing"
 
+	"github.com/KingrogKDR/omni/gen/kvpb"
 	"github.com/KingrogKDR/omni/internal/client"
 	"github.com/KingrogKDR/omni/internal/server"
 	singleStorage "github.com/KingrogKDR/omni/internal/storage/single_storage"
-	kvpb "github.com/KingrogKDR/omni/proto/gen/kv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"

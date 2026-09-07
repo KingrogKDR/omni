@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kv;
 
-option go_package = "proto/gen/kv";
+option go_package = "github.com/KingrogKDR/omni/gen/kvpb";
 
 service Omni {
   rpc Get(GetRequest) returns (GetResponse) {}

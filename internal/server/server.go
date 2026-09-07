@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/KingrogKDR/omni/gen/kvpb"
 	"github.com/KingrogKDR/omni/internal/storage"
-	kvpb "github.com/KingrogKDR/omni/proto/gen/kv"
 )
 
 type Server struct {

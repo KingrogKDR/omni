@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/KingrogKDR/omni/gen/kvpb"
 	"github.com/KingrogKDR/omni/internal/server"
 	singleStorage "github.com/KingrogKDR/omni/internal/storage/single_storage"
-	kvpb "github.com/KingrogKDR/omni/proto/gen/kv"
 	"google.golang.org/grpc"
 )
 

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	kvpb "github.com/KingrogKDR/omni/proto/gen/kv"
+	"github.com/KingrogKDR/omni/gen/kvpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
