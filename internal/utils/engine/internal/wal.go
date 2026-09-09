@@ -5,10 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 )
 
-type Wal struct {
-	entries []WalEntry
+type WAL struct {
+	entries []WALEntry
 }
 
 type Transaction uint8
@@ -18,8 +19,7 @@ const (
 	DeleteTransaction
 )
 
-type WalEntry struct {
-	lsn         uint64
+type WALEntry struct {
 	transaction Transaction
 	data        TransactionData
 }
@@ -41,118 +41,119 @@ type DeleteData struct {
 
 func (DeleteData) isTransaction() {}
 
-func NewWalEntry(t Transaction, data TransactionData) (*WalEntry, error) {
-	entry := &WalEntry{
-		transaction: t,
-		data:        data,
-	}
+func NewWALEntry(t Transaction, data TransactionData) (*WALEntry, error) {
 	switch d := data.(type) {
 	case PutData:
-		entry.data = PutData{
-			key: bytes.Clone(d.key),
-			val: bytes.Clone(d.val),
-		}
-
+		return &WALEntry{
+			transaction: PutTransaction,
+			data:        PutData{key: bytes.Clone(d.key), val: bytes.Clone(d.val)},
+		}, nil
 	case DeleteData:
-		entry.data = DeleteData{
-			key: bytes.Clone(d.key),
-		}
+		return &WALEntry{
+			transaction: DeleteTransaction,
+			data:        DeleteData{key: bytes.Clone(d.key)},
+		}, nil
 	default:
 		return nil, errors.New("unsupported data")
 
 	}
-
-	return entry, nil
 }
 
 var byteOrder = binary.LittleEndian
 
-func Encode(entry WalEntry) ([]byte, error) {
+func Encode(entry *WALEntry) ([]byte, error) {
 	var buf []byte
-	switch entry.transaction {
-	case PutTransaction:
-		buf = append(buf, 1)
-
-	case DeleteTransaction:
-		buf = append(buf, 2)
-
-	default:
-		return nil, errors.New("unsupported transaction")
-	}
 	switch d := entry.data.(type) {
 	case PutData:
+		buf = append(buf, byte(PutTransaction))
 		buf = byteOrder.AppendUint64(buf, uint64(len(d.key)))
 		buf = append(buf, d.key...)
 		buf = byteOrder.AppendUint64(buf, uint64(len(d.val)))
 		buf = append(buf, d.val...)
 	case DeleteData:
+		buf = append(buf, byte(DeleteTransaction))
 		buf = byteOrder.AppendUint64(buf, uint64(len(d.key)))
 		buf = append(buf, d.key...)
 	default:
-		return nil, errors.New("Invalid data for encoding: Requires KEY VALUE for PUT and KEY for DELETE")
+		return nil, errors.New("invalid data for encoding: Requires KEY VALUE for PUT and KEY for DELETE")
 	}
 
 	return buf, nil
 }
 
-// TODO: Replace with a bytes Reader and also uatomatically trim trailing bytes in encoder and hold a check in decoder
-func Decode(data []byte) (*WalEntry, error) {
+func Decode(data []byte) (*WALEntry, error) {
 	if len(data) < 1 {
-		return nil, errors.New("data is too short")
+		return nil, errors.New("truncated WAL entry: missing WAL data")
 	}
-	entry := &WalEntry{}
-
-	transactionType := data[0]
-
-	switch transactionType {
-	case 1:
-		entry.transaction = PutTransaction
-
-	case 2:
-		entry.transaction = DeleteTransaction
-
-	default:
-		return nil, fmt.Errorf("unknown transaction type: %d", transactionType)
+	reader := bytes.NewReader(data)
+	transactionByte, err := reader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("truncated WAL entry: missing transaction type: %w", err)
 	}
+	transaction := Transaction(transactionByte)
 
-	data = data[1:]
-	if len(data) < 8 {
-		return nil, errors.New("missing key length")
-	}
+	entry := &WALEntry{}
+	entry.transaction = transaction
 
-	keyLen := byteOrder.Uint64(data[:8])
-	data = data[8:]
-
-	if keyLen > uint64(len(data)) {
-		return nil, errors.New("invalid key length")
-	}
-
-	key := bytes.Clone(data[:keyLen])
-	data = data[keyLen:]
-
-	switch entry.transaction {
+	switch transaction {
 	case PutTransaction:
-		if len(data) < 8 {
-			return nil, errors.New("missing value length")
+		var keyLenBytes [8]byte
+		_, err = io.ReadFull(reader, keyLenBytes[:])
+		if err != nil {
+			return nil, fmt.Errorf("truncated WAL entry: missing key length: %w", err)
+		}
+		keyLen := byteOrder.Uint64(keyLenBytes[:])
+		if keyLen > uint64(reader.Len()) {
+			return nil, errors.New("truncated WAL entry: key length is larger than the rest of the data")
 		}
 
-		valLen := byteOrder.Uint64(data[:8])
-		data = data[8:]
-
-		if valLen > uint64(len(data)) {
-			return nil, errors.New("invalid value length")
+		key := make([]byte, keyLen)
+		_, err = io.ReadFull(reader, key)
+		if err != nil {
+			return nil, fmt.Errorf("truncated WAL entry: incomplete key: %w", err)
 		}
 
-		val := bytes.Clone(data[:valLen])
+		var valLenBytes [8]byte
+		_, err = io.ReadFull(reader, valLenBytes[:])
+		if err != nil {
+			return nil, fmt.Errorf("truncated WAL entry: missing value length: %w", err)
+		}
+		valLen := byteOrder.Uint64(valLenBytes[:])
+		if valLen > uint64(reader.Len()) {
+			return nil, errors.New("truncated WAL entry: value length is larger than the rest of the data")
+		}
 
+		val := make([]byte, valLen)
+		_, err = io.ReadFull(reader, val)
+		if err != nil {
+			return nil, fmt.Errorf("truncated WAL entry: incomplete value: %w", err)
+		}
 		entry.data = PutData{
 			key: key,
 			val: val,
 		}
 	case DeleteTransaction:
+		var keyLenBytes [8]byte
+		_, err = io.ReadFull(reader, keyLenBytes[:])
+		if err != nil {
+			return nil, fmt.Errorf("truncated WAL entry: missing key length: %w", err)
+		}
+		keyLen := byteOrder.Uint64(keyLenBytes[:])
+		if keyLen > uint64(reader.Len()) {
+			return nil, errors.New("truncated WAL entry: key length is larger than the rest of the data")
+		}
+
+		key := make([]byte, keyLen)
+		_, err = io.ReadFull(reader, key)
+		if err != nil {
+			return nil, fmt.Errorf("truncated WAL entry: incomplete key: %w", err)
+		}
+
 		entry.data = DeleteData{
 			key: key,
 		}
+	default:
+		return nil, errors.New("invalid transaction type")
 	}
 
 	return entry, nil
