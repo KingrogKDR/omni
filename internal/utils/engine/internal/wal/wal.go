@@ -1,4 +1,4 @@
-package engine
+package wal
 
 import (
 	"bytes"
@@ -9,7 +9,8 @@ import (
 )
 
 type WAL struct {
-	entries []WALEntry
+	entries     []WALEntry
+	MaxSegments uint32
 }
 
 type Transaction uint8
@@ -92,61 +93,29 @@ func Decode(data []byte) (WALEntry, error) {
 	}
 	transaction := Transaction(transactionByte)
 
-	entry := WALEntry{}
-	entry.transaction = transaction
+	entry := WALEntry{
+		transaction: transaction,
+	}
 
 	switch transaction {
 	case PutTransaction:
-		var keyLenBytes [8]byte
-		_, err = io.ReadFull(reader, keyLenBytes[:])
+		key, err := readField(reader, "key")
 		if err != nil {
-			return WALEntry{}, fmt.Errorf("truncated WAL entry: missing key length: %w", err)
-		}
-		keyLen := byteOrder.Uint64(keyLenBytes[:])
-		if keyLen > uint64(reader.Len()) {
-			return WALEntry{}, errors.New("truncated WAL entry: key length is larger than the rest of the data")
+			return WALEntry{}, nil
 		}
 
-		key := make([]byte, keyLen)
-		_, err = io.ReadFull(reader, key)
+		val, err := readField(reader, "value")
 		if err != nil {
-			return WALEntry{}, fmt.Errorf("truncated WAL entry: incomplete key: %w", err)
-		}
-
-		var valLenBytes [8]byte
-		_, err = io.ReadFull(reader, valLenBytes[:])
-		if err != nil {
-			return WALEntry{}, fmt.Errorf("truncated WAL entry: missing value length: %w", err)
-		}
-		valLen := byteOrder.Uint64(valLenBytes[:])
-		if valLen > uint64(reader.Len()) {
-			return WALEntry{}, errors.New("truncated WAL entry: value length is larger than the rest of the data")
-		}
-
-		val := make([]byte, valLen)
-		_, err = io.ReadFull(reader, val)
-		if err != nil {
-			return WALEntry{}, fmt.Errorf("truncated WAL entry: incomplete value: %w", err)
+			return WALEntry{}, nil
 		}
 		entry.data = PutData{
 			key: key,
 			val: val,
 		}
 	case DeleteTransaction:
-		var keyLenBytes [8]byte
-		_, err = io.ReadFull(reader, keyLenBytes[:])
+		key, err := readField(reader, "key")
 		if err != nil {
-			return WALEntry{}, fmt.Errorf("truncated WAL entry: missing key length: %w", err)
-		}
-		keyLen := byteOrder.Uint64(keyLenBytes[:])
-		if keyLen > uint64(reader.Len()) {
-			return WALEntry{}, errors.New("truncated WAL entry: key length is larger than the rest of the data")
-		}
-
-		key := make([]byte, keyLen)
-		_, err = io.ReadFull(reader, key)
-		if err != nil {
-			return WALEntry{}, fmt.Errorf("truncated WAL entry: incomplete key: %w", err)
+			return WALEntry{}, err
 		}
 
 		entry.data = DeleteData{
@@ -157,4 +126,20 @@ func Decode(data []byte) (WALEntry, error) {
 	}
 
 	return entry, nil
+}
+
+func readField(reader *bytes.Reader, field string) ([]byte, error) {
+	var lenBytes [8]byte
+	if _, err := io.ReadFull(reader, lenBytes[:]); err != nil {
+		return nil, fmt.Errorf("truncated WAL entry: missing %s length: %w", field, err)
+	}
+	length := byteOrder.Uint64(lenBytes[:])
+	if length > uint64(reader.Len()) {
+		return nil, fmt.Errorf("truncated WAL entry: %s length is larger than the rest of the data", field)
+	}
+	data := make([]byte, length)
+	if _, err := io.ReadFull(reader, data); err != nil {
+		return nil, fmt.Errorf("truncated WAL entry: incomplete %s: %w", field, err)
+	}
+	return data, nil
 }
