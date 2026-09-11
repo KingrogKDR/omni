@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 )
 
 type WAL struct {
-	entries     []WALEntry
-	MaxSegments uint32
+	entries        []WALEntry
+	currentSegment *os.File
+	MaxSegments    uint32
 }
 
 type Transaction uint8

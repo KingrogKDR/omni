@@ -1,6 +1,6 @@
-# Design document for Omni
+# The underlying tools for Omni
 
-Everything related to the design decisions made keeping in mind the tradeoffs and usecases.
+Everything related to the underlying tools used in Omni keeping in mind the tradeoffs and usecases.
 
 ## The network layer
 
