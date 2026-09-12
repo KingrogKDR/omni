@@ -3,6 +3,7 @@ module github.com/KingrogKDR/omni
 go 1.27.0
 
 require (
+	github.com/KingrogKDR/kWALity v0.0.2
 	github.com/dgraph-io/badger v1.6.2
 	google.golang.org/grpc v1.83.1
 	google.golang.org/protobuf v1.36.12
