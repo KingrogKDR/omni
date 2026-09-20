@@ -1,4 +1,4 @@
-# Semy
+# Omni
 
 A drop-in caching proxy that sits between your agents/apps and Claude/OpenAI, returning cached answers for repeated or near-duplicate prompts instead of paying for and waiting on a fresh LLM call.
 
