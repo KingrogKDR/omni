@@ -34,11 +34,11 @@ type Store interface {
 	// including DefaultCF.
 	ColumnFamilies() []CFName
 
-	// Put writes key -> value with no expiry, in the given column family.
+	// Put writes key -> value with no expiry, in the given column family. Overwrites existing key with new value.
 	// Returns ErrColumnFamilyNotFound if cf has not been created.
 	Put(cf CFName, key, value []byte) error
 
-	// PutWithTTL writes key -> value that expires after ttl elapses.
+	// PutWithTTL writes key -> value that expires after ttl elapses. Overwrites existing key with new value.
 	PutWithTTL(cf CFName, key, value []byte, ttl time.Duration) error
 
 	// Get returns the value for key in the given column family. found is
@@ -52,4 +52,15 @@ type Store interface {
 	// (pure in-memory) it is a no-op, but every implementation must provide
 	// it since later iterations (WAL file handles, SSTable files) need it.
 	Close() error
+}
+
+type Entry struct {
+	HasExpiry bool
+	ExpiresAt time.Time
+	Tombstone bool
+	Val       []byte
+}
+
+func (e *Entry) IsExpired(now time.Time) bool {
+	return e.HasExpiry && now.After(e.ExpiresAt)
 }

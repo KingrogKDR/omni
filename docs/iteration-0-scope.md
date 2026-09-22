@@ -1,6 +1,6 @@
 # Iteration 0 — Scope & Contracts
 
-## API surface (locked for the whole project)
+## API surface (for the project v1)
 
 ```go
 Put(cf CFName, key, value []byte) error
@@ -50,7 +50,7 @@ expired key). A background sweeper is a compaction-time concern, revisited later
 
 ## Explicit non-goals for the whole project
 
-- No range scans / iterators
+- No scans / iterators
 - No transactions or distributed semantics
 - No replication or clustering
 - No custom on-disk vector index (semantic search stays on pgvector)
