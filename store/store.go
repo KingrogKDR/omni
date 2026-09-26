@@ -54,11 +54,19 @@ type Store interface {
 	Close() error
 }
 
+type EntryType uint8
+
+const (
+	PUT EntryType = iota + 1
+	DELETE
+)
+
 type Entry struct {
 	HasExpiry bool
 	ExpiresAt time.Time
 	Tombstone bool
 	Val       []byte
+	Typ       EntryType
 }
 
 func (e *Entry) IsExpired(now time.Time) bool {

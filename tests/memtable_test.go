@@ -85,17 +85,18 @@ func TestGetMissing(t *testing.T) {
 				[]byte("does-not-exist"),
 			)
 
-			if err != nil {
-				t.Fatalf("Get() error = %v", err)
+			if !errors.Is(err, store.ErrKeyNotFound) {
+				t.Fatalf("Get() error = %v, want %v", err, store.ErrKeyNotFound)
 			}
 
 			if found {
-				t.Fatal("Get() found = true, want false")
+				t.Fatal("missing key was found")
 			}
 
 			if got != nil {
 				t.Fatalf("Get() value = %q, want nil", got)
 			}
+
 		})
 	}
 }
@@ -153,9 +154,6 @@ func TestDeleteThenGet(t *testing.T) {
 			}
 
 			got, found, err := s.Get(store.DefaultCF, key)
-			if err != nil {
-				t.Fatal(err)
-			}
 
 			if !errors.Is(err, store.ErrKeyNotFound) {
 				t.Fatalf("Get() error = %v, want %v", err, store.ErrKeyNotFound)

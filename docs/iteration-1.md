@@ -12,3 +12,4 @@
 ## TODOs
 
 - CF deletion and CF lifecycle
+- Add and manage sequence number in Entry
