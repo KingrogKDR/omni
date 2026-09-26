@@ -2,6 +2,8 @@ package memtable
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -74,7 +76,10 @@ func (m *Memtable) CreateColumnFamily(cf store.CFName) error {
 }
 
 func (m *Memtable) ColumnFamilies() []store.CFName {
-	return nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return slices.Collect(maps.Keys(m.cfs))
 }
 
 func (m *Memtable) getDataStructure(

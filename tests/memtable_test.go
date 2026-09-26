@@ -41,7 +41,7 @@ func testStores() []struct {
 	}
 }
 
-func TestStorePutGet(t *testing.T) {
+func TestPutGet(t *testing.T) {
 	for _, tt := range testStores() {
 		t.Run(tt.name, func(t *testing.T) {
 			s, err := tt.new(t)
@@ -72,7 +72,7 @@ func TestStorePutGet(t *testing.T) {
 	}
 }
 
-func TestStoreGetMissing(t *testing.T) {
+func TestGetMissing(t *testing.T) {
 	for _, tt := range testStores() {
 		t.Run(tt.name, func(t *testing.T) {
 			s, err := tt.new(t)
@@ -100,7 +100,7 @@ func TestStoreGetMissing(t *testing.T) {
 	}
 }
 
-func TestStoreOverwrite(t *testing.T) {
+func TestOverwrite(t *testing.T) {
 	for _, tt := range testStores() {
 		t.Run(tt.name, func(t *testing.T) {
 			s, err := tt.new(t)
@@ -134,7 +134,7 @@ func TestStoreOverwrite(t *testing.T) {
 	}
 }
 
-func TestStoreDelete(t *testing.T) {
+func TestDeleteThenGet(t *testing.T) {
 	for _, tt := range testStores() {
 		t.Run(tt.name, func(t *testing.T) {
 			s, err := tt.new(t)
@@ -172,7 +172,7 @@ func TestStoreDelete(t *testing.T) {
 	}
 }
 
-func TestStoreExpiration(t *testing.T) {
+func TestTTLExpiry(t *testing.T) {
 	for _, tt := range testStores() {
 		t.Run(tt.name, func(t *testing.T) {
 			s, err := tt.new(t)
